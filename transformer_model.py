@@ -40,12 +40,22 @@ if __name__ == "__main__":
     with open("input.txt", "r", encoding="utf-8") as f:
         text = f.read()
 
+    # Setting the device
+    device = "mps" if torch.backends.mps.is_available() else "cpu"
+    print("Using {} device".format(device))
+
     # Data Preprocessing
     chars = sorted(list(set(text)))
     itos = {i: c for i, c in enumerate(chars)}
     stoi = {c: i for i, c in enumerate(chars)}
     encode = lambda s: [stoi[c] for c in s]
     decode = lambda l: "".join([itos[i] for i in l])
+
+    # Train and Test Splits
+    data = torch.tensor(encode(text), dtype=torch.long)
+    n = int(0.9 * len(data))
+    train_data = data[:n]
+    val_data = data[n:]
 
     # Hyperparameters
     vocab_size = len(chars)
