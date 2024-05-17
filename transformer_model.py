@@ -20,14 +20,16 @@ def get_batches(data, batch_size, block_size):
 
 
 @torch.no_grad()
-def estimate_loss(model, val_data, batch_size, eval_iters):
+def estimate_loss(model, dataset, batch_size, eval_iters):
+    out = {}
     model.eval()
-    losses = torch.zeros(eval_iters)
-    for k in range(eval_iters):
-        X, Y = get_batches(val_data, batch_size, model.config.block_size)
-        logits, loss = model(X, Y)
-        losses[k] = loss.item()
-    out = losses.mean()
+    for split in ["train", "val"]:
+        losses = torch.zeros(eval_iters)
+        for k in range(eval_iters):
+            X, Y = get_batches(dataset[split], batch_size, model.config.block_size)
+            logits, loss = model(X, Y)
+            losses[k] = loss.item()
+        out[split] = losses.mean()
     model.train()
     return out
 
@@ -84,11 +86,13 @@ if __name__ == "__main__":
     n = int(0.9 * len(data))
     train_data = data[:n]
     val_data = data[n:]
+    dataset = {"train": train_data, "val": val_data}
 
     vocab_size = len(chars)
 
     # Training Hyperparameters
-    max_iters = 3000
+    batch_size = 32
+    max_iters = 5000
     eval_iters = 200
     eval_interval = 300
 
@@ -101,11 +105,15 @@ if __name__ == "__main__":
     for iter in range(max_iters):
         if iter % eval_interval == 0:
             losses = estimate_loss(
-                model, val_data, batch_size=32, eval_iters=eval_iters
+                model, dataset, batch_size=batch_size, eval_iters=eval_iters
             )
-            print(f"Iteration: {iter}, Val Loss: {losses}")
+            print(
+                f"iteration: {iter}, train_loss: {losses['train']:.4f} val_loss: {losses['val']:.4f}"
+            )
 
-        xb, yb = get_batches(train_data, batch_size=32, block_size=128)
+        xb, yb = get_batches(
+            train_data, batch_size=batch_size, block_size=model.config.block_size
+        )
         logits, loss = model(xb, yb)
 
         optimizer.zero_grad(set_to_none=True)
@@ -114,4 +122,4 @@ if __name__ == "__main__":
 
     # Autoregressive Inference
     start_idx = torch.zeros((1, 1), dtype=torch.long).to(device)
-    print(decode(model.generate(start_idx, n=200)[0].tolist()))
+    print(decode(model.generate(start_idx, n=500)[0].tolist()))
