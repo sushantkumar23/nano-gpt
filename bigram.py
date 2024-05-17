@@ -8,7 +8,7 @@ block_size = 8  # what is the maximum context length for predictions?
 max_iters = 3000
 eval_interval = 300
 learning_rate = 1e-2
-device = "cuda" if torch.cuda.is_available() else "cpu"
+device = "mps" if torch.backends.mps.is_available() else "cpu"
 eval_iters = 200
 # ----------
 
@@ -126,4 +126,4 @@ for iter in range(max_iters):
 
 # generate from the model
 context = torch.zeros((1, 1), dtype=torch.long, device=device)
-print(decode(m.generate(context, 500)[0].tolist()))
+print(decode(m.generate(context, 1000)[0].tolist()))
