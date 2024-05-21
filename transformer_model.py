@@ -8,8 +8,9 @@ import torch.nn.functional as F
 @dataclass
 class ModelConfig:
     vocab_size: int
-    n_embd: int = 32
+    dim: int = 32
     block_size: int = 16
+    ffn_multiplier: int = 4
 
 
 def get_batches(data, batch_size, block_size):
@@ -34,20 +35,68 @@ def estimate_loss(model, dataset, batch_size, eval_iters):
     return out
 
 
+class SelfAttention(nn.Module):
+
+    def __init__(self, config: ModelConfig):
+        super().__init__()
+        self.dim = config.dim
+        self.wq = nn.Linear(in_features=config.dim, out_features=config.dim)
+        self.wk = nn.Linear(in_features=config.dim, out_features=config.dim)
+        self.wv = nn.Linear(in_features=config.dim, out_features=config.dim)
+
+        self.register_buffer(
+            "mask", torch.tril(torch.ones(config.block_size, config.block_size))
+        )
+
+    def forward(self, x):
+        B, T, C = x.shape
+        q = self.wq(x)
+        k = self.wk(x)
+        v = self.wv(x)
+
+        # Scaled Dot-Product Attention
+        # (B, T, C) x (B, C, T) -> (B, T, T)
+        wei = q @ k.transpose(-2, -1) * (1.0 / (self.dim**0.5))
+        wei = wei.masked_fill(self.mask[:T, :T] == 0, float("-inf"))
+        wei = F.softmax(wei, dim=-1)
+
+        # (B, T, T) x (B, T, C) -> (B, T, C)
+        output = wei @ v
+        return output
+
+
+class FeedForward(nn.Module):
+
+    def __init__(self, config: ModelConfig):
+        super().__init__()
+        self.ff1 = nn.Linear(
+            in_features=config.dim, out_features=config.dim * config.ffn_multiplier
+        )
+        self.ff2 = nn.Linear(
+            in_features=config.dim * config.ffn_multiplier, out_features=config.dim
+        )
+
+    def forward(self, x):
+        return self.ff2(F.relu(self.ff1(x)))
+
+
 class LanguageModel(nn.Module):
 
     def __init__(self, config: ModelConfig):
         super().__init__()
         self.config = config
         self.token_embedding_table = nn.Embedding(
-            num_embeddings=config.vocab_size, embedding_dim=config.n_embd
+            num_embeddings=config.vocab_size, embedding_dim=config.dim
         )
         self.pos_embedding_table = nn.Embedding(
-            num_embeddings=config.block_size, embedding_dim=config.n_embd
+            num_embeddings=config.block_size, embedding_dim=config.dim
         )
 
+        self.attention = SelfAttention(config)
+        self.feed_forward = FeedForward(config)
+
         self.lm_head = nn.Linear(
-            in_features=config.n_embd, out_features=vocab_size
+            in_features=config.dim, out_features=vocab_size
         )  # (B, T, vocab_size)
 
     def forward(self, x, targets=None):
@@ -57,6 +106,8 @@ class LanguageModel(nn.Module):
 
         # tok(B, T, C) + pos(T, C) [broadcasting] -> x(B, T, C)
         x = tok_emb + pos_emb
+        x = self.attention(x)
+        x = self.feed_forward(x)
         logits = self.lm_head(x)
 
         if targets is not None:
@@ -144,4 +195,4 @@ if __name__ == "__main__":
 
     # Autoregressive Inference
     start_idx = torch.zeros((1, 1), dtype=torch.long).to(device)
-    print(decode(model.generate(start_idx, n=40)[0].tolist()))
+    print(decode(model.generate(start_idx, n=500)[0].tolist()))
