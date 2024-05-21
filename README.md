@@ -4,10 +4,10 @@ Building a GPT-like decoder-only transformer from scratch using PyTorch. The tra
 
 ### Phase 1
 
-- [ ] Self-Attention
-- [ ] Scaled Dot-Product Attention
-- [ ] Feed-Forward Network
-- [ ] Positional Embedding
+- [x] Self-Attention
+- [x] Scaled Dot-Product Attention
+- [x] Feed-Forward Network
+- [x] Positional Embedding
 - [ ] Multi-Head Attention
 - [ ] Normalization
 
