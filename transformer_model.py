@@ -8,6 +8,7 @@ import torch.nn.functional as F
 @dataclass
 class ModelConfig:
     vocab_size: int
+    n_layers: int = 2
     dim: int = 32
     block_size: int = 16
     ffn_multiplier: int = 4
@@ -80,6 +81,19 @@ class FeedForward(nn.Module):
         return self.ff2(F.relu(self.ff1(x)))
 
 
+class TransformerBlock(nn.Module):
+
+    def __init__(self, config: ModelConfig):
+        super().__init__()
+        self.attention = SelfAttention(config)
+        self.feed_forward = FeedForward(config)
+
+    def forward(self, x):
+        x = self.attention(x)
+        x = self.feed_forward(x)
+        return x
+
+
 class LanguageModel(nn.Module):
 
     def __init__(self, config: ModelConfig):
@@ -92,8 +106,7 @@ class LanguageModel(nn.Module):
             num_embeddings=config.block_size, embedding_dim=config.dim
         )
 
-        self.attention = SelfAttention(config)
-        self.feed_forward = FeedForward(config)
+        self.blocks = nn.ModuleList([TransformerBlock(config) for _ in range(2)])
 
         self.lm_head = nn.Linear(
             in_features=config.dim, out_features=vocab_size
