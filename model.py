@@ -8,10 +8,11 @@ import torch.nn.functional as F
 @dataclass
 class ModelConfig:
     vocab_size: int
-    n_layers: int = 3
-    dim: int = 32
-    block_size: int = 16
+    n_layers: int = 8
+    dim: int = 48
+    block_size: int = 32
     ffn_multiplier: int = 4
+    norm_eps: float = 1e-5
 
 
 def get_batches(data, batch_size, block_size):
@@ -85,15 +86,20 @@ class TransformerBlock(nn.Module):
 
     def __init__(self, config: ModelConfig):
         super().__init__()
+        self.attention_norm = nn.LayerNorm(config.dim, eps=config.norm_eps)
         self.attention = SelfAttention(config)
+
+        self.feed_forward_norm = nn.LayerNorm(config.dim, eps=config.norm_eps)
         self.feed_forward = FeedForward(config)
 
     def forward(self, x):
         residual = x
+        x = self.attention_norm(x)
         x = self.attention(x)
         x = x + residual
 
         residual = x
+        x = self.feed_forward_norm(x)
         x = self.feed_forward(x)
         x = x + residual
         return x
@@ -218,4 +224,4 @@ if __name__ == "__main__":
 
     # Autoregressive Inference
     start_idx = torch.zeros((1, 1), dtype=torch.long).to(device)
-    print(decode(model.generate(start_idx, n=500)[0].tolist()))
+    print(decode(model.generate(start_idx, n=600)[0].tolist()))

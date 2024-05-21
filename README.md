@@ -1,6 +1,8 @@
-## Implementation of Transformer
+## Improving the Transformers
 
-Building a GPT-like decoder-only transformer from scratch using PyTorch. The transformer is implemented in `model.py` and the training can be done by setting the `training` flag to `True` in `model.py`.
+We will be building a GPT-like decoder-only transformer from scratch using PyTorch in phases, starting with the original Transformers introduced in the paper "Attention is All You Need" by Vaswani et al. and progressively move on to more advanced architectural improvements that have been proposed in recent research papers.
+
+The transformer is implemented in `model.py` and the training can be done by setting the `training` flag to `True` in `model.py`.
 
 ### Phase 1
 
@@ -9,8 +11,8 @@ Building a GPT-like decoder-only transformer from scratch using PyTorch. The tra
 - [x] Feed-Forward Network
 - [x] Positional Embedding
 - [x] Residual Connection
+- [x] Layer Normalization
 - [ ] Multi-Head Attention
-- [ ] Layer Normalization
 
 ### Phase 2
 
@@ -19,3 +21,5 @@ Building a GPT-like decoder-only transformer from scratch using PyTorch. The tra
 - [ ] KV Cache
 - [ ] Multi-Query Attention
 - [ ] SwiGLU Activation (Feed-Forward Network)
+- [ ] Sliding Window Attention
+- [ ] Mixture of Experts
