@@ -9,6 +9,7 @@ import torch.nn.functional as F
 class ModelConfig:
     vocab_size: int
     n_layers: int = 8
+    n_heads: int = 8
     dim: int = 48
     block_size: int = 32
     ffn_multiplier: int = 4
@@ -35,6 +36,59 @@ def estimate_loss(model, dataset, batch_size, eval_iters):
         out[split] = losses.mean()
     model.train()
     return out
+
+
+class MultiHeadSelfAttention(nn.Module):
+
+    def __init__(self, config: ModelConfig):
+        super().__init__()
+        self.dim = config.dim
+        self.n_heads = config.n_heads
+
+        assert self.dim % self.n_heads == 0
+        self.head_dim = config.dim // config.n_heads
+
+        self.wq = nn.Linear(
+            in_features=config.dim, out_features=self.n_heads * self.head_dim
+        )
+        self.wk = nn.Linear(
+            in_features=config.dim, out_features=self.n_heads * self.head_dim
+        )
+        self.wv = nn.Linear(
+            in_features=config.dim, out_features=self.n_heads * self.head_dim
+        )
+
+        self.wo = nn.Linear(
+            in_features=self.n_heads * self.head_dim, out_features=config.dim
+        )
+
+        self.register_buffer(
+            "mask", torch.tril(torch.ones(config.block_size, config.block_size))
+        )
+
+    def forward(self, x):
+        B, T, C = x.shape
+        q = self.wq(x)
+        k = self.wk(x)
+        v = self.wv(x)
+
+        # (B, T, C) -> (B, T, n_heads, head_dim) -> (B, n_heads, T, head_dim)
+        q = q.view(B, T, self.n_heads, self.head_dim).transpose(1, 2)
+        k = k.view(B, T, self.n_heads, self.head_dim).transpose(1, 2)
+        v = v.view(B, T, self.n_heads, self.head_dim).transpose(1, 2)
+
+        # Scaled Dot-Product Attention
+        # (B, n_heads, T, head_dim) x (B, n_heads, head_dim, T) -> (B, n_heads, T, T)
+        wei = q @ k.transpose(-2, -1) * (1.0 / (self.head_dim**0.5))
+        wei = wei.masked_fill(self.mask[:T, :T] == 0, float("-inf"))
+        wei = F.softmax(wei, dim=-1)
+
+        # (B, n_heads, T, T) x (B, n_heads, T, head_dim) -> (B, n_heads, T, head_dim)
+        output = wei @ v
+        output = output.transpose(1, 2).contiguous().view(B, T, C)
+        output = self.wo(output)
+
+        return output
 
 
 class SelfAttention(nn.Module):
@@ -87,7 +141,10 @@ class TransformerBlock(nn.Module):
     def __init__(self, config: ModelConfig):
         super().__init__()
         self.attention_norm = nn.LayerNorm(config.dim, eps=config.norm_eps)
-        self.attention = SelfAttention(config)
+
+        # self.attention = SelfAttention(config)
+        # MultiHeadSelfAttention: Drop-in replacement for SelfAttention
+        self.attention = MultiHeadSelfAttention(config)
 
         self.feed_forward_norm = nn.LayerNorm(config.dim, eps=config.norm_eps)
         self.feed_forward = FeedForward(config)
@@ -168,9 +225,12 @@ if __name__ == "__main__":
         text = f.read()
 
     # Setting the device
-    # device = "mps" if torch.backends.mps.is_available() else "cpu"
-    # Setting the device to "mps" is causing issues in nn.Embedding
     device = "cpu"
+    if torch.cuda.is_available():
+        device = "cuda"
+    elif torch.backends.mps.is_available():
+        device = "mps"
+    # Setting the device to "mps" is causing issues in nn.Embedding
     print("Using {} device".format(device))
 
     # Data Preprocessing
