@@ -8,10 +8,10 @@ import torch.nn.functional as F
 @dataclass
 class ModelConfig:
     vocab_size: int
-    n_layers: int = 8
-    n_heads: int = 8
-    dim: int = 48
-    block_size: int = 32
+    n_layers: int
+    n_heads: int
+    dim: int
+    block_size: int
     ffn_multiplier: int = 4
     norm_eps: float = 1e-5
 
@@ -150,14 +150,10 @@ class TransformerBlock(nn.Module):
         self.feed_forward = FeedForward(config)
 
     def forward(self, x):
-        residual = x
-        x = self.attention_norm(x)
-        x = self.attention(x)
+        residual = self.attention(self.attention_norm(x))
         x = x + residual
 
-        residual = x
-        x = self.feed_forward_norm(x)
-        x = self.feed_forward(x)
+        residual = self.feed_forward(self.feed_forward_norm(x))
         x = x + residual
         return x
 
@@ -179,7 +175,7 @@ class LanguageModel(nn.Module):
         )
 
         self.lm_head = nn.Linear(
-            in_features=config.dim, out_features=vocab_size
+            in_features=config.dim, out_features=config.vocab_size
         )  # (B, T, vocab_size)
 
     def forward(self, x, targets=None):
@@ -242,7 +238,13 @@ if __name__ == "__main__":
     decode = lambda l: "".join([itos[i] for i in l])
 
     # Initialization
-    model_config = ModelConfig(vocab_size=vocab_size)
+    model_config = ModelConfig(
+        vocab_size=vocab_size,
+        n_layers=12,
+        n_heads=8,
+        dim=48,
+        block_size=64,
+    )
     model = LanguageModel(config=model_config).to(device)
     training = True
 
