@@ -154,6 +154,7 @@ if __name__ == "__main__":
 
     # Setting the device
     # device = "mps" if torch.backends.mps.is_available() else "cpu"
+    # Setting the device to "mps" is causing issues in nn.Embedding
     device = "cpu"
     print("Using {} device".format(device))
 

@@ -1,6 +1,6 @@
 ## Implementation of Transformer
 
-Building a GPT-like decoder-only transformer from scratch using PyTorch. The transformer is implemented in `transformer_model.py` and the training can be done by setting the `training` flag to `True` in `transformer_model.py`.
+Building a GPT-like decoder-only transformer from scratch using PyTorch. The transformer is implemented in `model.py` and the training can be done by setting the `training` flag to `True` in `model.py`.
 
 ### Phase 1
 
@@ -9,7 +9,7 @@ Building a GPT-like decoder-only transformer from scratch using PyTorch. The tra
 - [x] Feed-Forward Network
 - [x] Positional Embedding
 - [ ] Multi-Head Attention
-- [ ] Normalization
+- [ ] Layer Normalization
 
 ### Phase 2
 
