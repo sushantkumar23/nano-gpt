@@ -8,12 +8,12 @@ Building a GPT-like decoder-only transformer from scratch using PyTorch. The tra
 - [x] Scaled Dot-Product Attention
 - [x] Feed-Forward Network
 - [x] Positional Embedding
+- [x] Residual Connection
 - [ ] Multi-Head Attention
 - [ ] Layer Normalization
 
 ### Phase 2
 
-- [ ] Residual Connection
 - [ ] Rotary Positional Embedding
 - [ ] RMS Layer Normalization
 - [ ] KV Cache

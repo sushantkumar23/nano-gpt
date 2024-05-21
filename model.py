@@ -8,7 +8,7 @@ import torch.nn.functional as F
 @dataclass
 class ModelConfig:
     vocab_size: int
-    n_layers: int = 2
+    n_layers: int = 3
     dim: int = 32
     block_size: int = 16
     ffn_multiplier: int = 4
@@ -89,8 +89,13 @@ class TransformerBlock(nn.Module):
         self.feed_forward = FeedForward(config)
 
     def forward(self, x):
+        residual = x
         x = self.attention(x)
+        x = x + residual
+
+        residual = x
         x = self.feed_forward(x)
+        x = x + residual
         return x
 
 
@@ -106,7 +111,9 @@ class LanguageModel(nn.Module):
             num_embeddings=config.block_size, embedding_dim=config.dim
         )
 
-        self.blocks = nn.ModuleList([TransformerBlock(config) for _ in range(2)])
+        self.blocks = nn.ModuleList(
+            [TransformerBlock(config) for _ in range(config.n_layers)]
+        )
 
         self.lm_head = nn.Linear(
             in_features=config.dim, out_features=vocab_size
@@ -119,8 +126,10 @@ class LanguageModel(nn.Module):
 
         # tok(B, T, C) + pos(T, C) [broadcasting] -> x(B, T, C)
         x = tok_emb + pos_emb
-        x = self.attention(x)
-        x = self.feed_forward(x)
+
+        for block in self.blocks:
+            x = block(x)
+
         logits = self.lm_head(x)
 
         if targets is not None:
@@ -186,7 +195,7 @@ if __name__ == "__main__":
         max_iters = 5000
         eval_iters = 200
         eval_interval = 300
-        learning_rate = 0.001
+        learning_rate = 0.003
 
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
         for iter in range(max_iters):
