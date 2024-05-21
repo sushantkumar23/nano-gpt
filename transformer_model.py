@@ -9,7 +9,7 @@ import torch.nn.functional as F
 class ModelConfig:
     vocab_size: int
     n_embd: int = 32
-    block_size: int = 8
+    block_size: int = 16
 
 
 def get_batches(data, batch_size, block_size):
@@ -39,12 +39,25 @@ class LanguageModel(nn.Module):
     def __init__(self, config: ModelConfig):
         super().__init__()
         self.config = config
-        self.token_embedding_table = nn.Embedding(config.vocab_size, config.n_embd)
-        self.lm_head = nn.Linear(config.n_embd, vocab_size)
+        self.token_embedding_table = nn.Embedding(
+            num_embeddings=config.vocab_size, embedding_dim=config.n_embd
+        )
+        self.pos_embedding_table = nn.Embedding(
+            num_embeddings=config.block_size, embedding_dim=config.n_embd
+        )
+
+        self.lm_head = nn.Linear(
+            in_features=config.n_embd, out_features=vocab_size
+        )  # (B, T, vocab_size)
 
     def forward(self, x, targets=None):
+        B, T = x.shape
         tok_emb = self.token_embedding_table(x)
-        logits = self.lm_head(tok_emb)
+        pos_emb = self.pos_embedding_table(torch.arange(T, device=x.device))
+
+        # tok(B, T, C) + pos(T, C) [broadcasting] -> x(B, T, C)
+        x = tok_emb + pos_emb
+        logits = self.lm_head(x)
 
         if targets is not None:
             B, T, C = logits.shape
@@ -58,7 +71,12 @@ class LanguageModel(nn.Module):
         # x.shape = (B, T)
         for _ in range(n):
             # (B, T) -> (B, T, C)
-            logits, _ = self(x)
+            x_cond = (
+                x
+                if x.size(1) <= self.config.block_size
+                else x[:, -self.config.block_size :]
+            )
+            logits, _ = self(x_cond)
             probs = F.softmax(logits, dim=-1)
             last_probs = probs[:, -1, :]
             idx_next = torch.multinomial(last_probs, 1)
@@ -71,55 +89,59 @@ if __name__ == "__main__":
         text = f.read()
 
     # Setting the device
-    device = "mps" if torch.backends.mps.is_available() else "cpu"
+    # device = "mps" if torch.backends.mps.is_available() else "cpu"
+    device = "cpu"
     print("Using {} device".format(device))
 
     # Data Preprocessing
     chars = sorted(list(set(text)))
+    vocab_size = len(chars)
     itos = {i: c for i, c in enumerate(chars)}
     stoi = {c: i for i, c in enumerate(chars)}
     encode = lambda s: [stoi[c] for c in s]
     decode = lambda l: "".join([itos[i] for i in l])
 
-    # Train and Test Splits
-    data = torch.tensor(encode(text), dtype=torch.long).to(device)
-    n = int(0.9 * len(data))
-    train_data = data[:n]
-    val_data = data[n:]
-    dataset = {"train": train_data, "val": val_data}
-
-    vocab_size = len(chars)
-
-    # Training Hyperparameters
-    batch_size = 32
-    max_iters = 5000
-    eval_iters = 200
-    eval_interval = 300
-
     # Initialization
     model_config = ModelConfig(vocab_size=vocab_size)
     model = LanguageModel(config=model_config).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    training = True
 
-    # Training loop
-    for iter in range(max_iters):
-        if iter % eval_interval == 0:
-            losses = estimate_loss(
-                model, dataset, batch_size=batch_size, eval_iters=eval_iters
+    # Training Code
+    if training:
+
+        # Train and Test Splits
+        data = torch.tensor(encode(text), dtype=torch.long).to(device)
+        n = int(0.9 * len(data))
+        train_data = data[:n]
+        val_data = data[n:]
+        dataset = {"train": train_data, "val": val_data}
+
+        # Training Hyperparameters
+        batch_size = 32
+        max_iters = 5000
+        eval_iters = 200
+        eval_interval = 300
+        learning_rate = 0.001
+
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+        for iter in range(max_iters):
+            if iter % eval_interval == 0:
+                losses = estimate_loss(
+                    model, dataset, batch_size=batch_size, eval_iters=eval_iters
+                )
+                print(
+                    f"iteration: {iter}, train_loss: {losses['train']:.4f} val_loss: {losses['val']:.4f}"
+                )
+
+            xb, yb = get_batches(
+                train_data, batch_size=batch_size, block_size=model.config.block_size
             )
-            print(
-                f"iteration: {iter}, train_loss: {losses['train']:.4f} val_loss: {losses['val']:.4f}"
-            )
+            logits, loss = model(xb, yb)
 
-        xb, yb = get_batches(
-            train_data, batch_size=batch_size, block_size=model.config.block_size
-        )
-        logits, loss = model(xb, yb)
-
-        optimizer.zero_grad(set_to_none=True)
-        loss.backward()
-        optimizer.step()
+            optimizer.zero_grad(set_to_none=True)
+            loss.backward()
+            optimizer.step()
 
     # Autoregressive Inference
     start_idx = torch.zeros((1, 1), dtype=torch.long).to(device)
-    print(decode(model.generate(start_idx, n=500)[0].tolist()))
+    print(decode(model.generate(start_idx, n=40)[0].tolist()))
