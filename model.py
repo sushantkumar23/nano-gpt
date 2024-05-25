@@ -62,9 +62,14 @@ class MultiHeadSelfAttention(nn.Module):
             in_features=self.n_heads * self.head_dim, out_features=config.dim
         )
 
-        self.register_buffer(
-            "mask", torch.tril(torch.ones(config.block_size, config.block_size))
+        self.flash_attention = hasattr(
+            torch.nn.functional, "scaled_dot_product_attention"
         )
+        if not self.flash_attention:
+            print("Using PyTorch's native attention")
+            self.register_buffer(
+                "mask", torch.tril(torch.ones(config.block_size, config.block_size))
+            )
 
     def forward(self, x):
         B, T, C = x.shape
@@ -78,14 +83,18 @@ class MultiHeadSelfAttention(nn.Module):
         v = v.view(B, T, self.n_heads, self.head_dim).transpose(1, 2)
 
         # Scaled Dot-Product Attention
-        # (B, n_heads, T, head_dim) x (B, n_heads, head_dim, T) -> (B, n_heads, T, T)
-        wei = q @ k.transpose(-2, -1) * (1.0 / (self.head_dim**0.5))
-        wei = wei.masked_fill(self.mask[:T, :T] == 0, float("-inf"))
-        wei = F.softmax(wei, dim=-1)
+        if self.flash_attention:
+            y = F.scaled_dot_product_attention(q, k, v, is_causal=True)
+        else:
+            # (B, n_heads, T, head_dim) x (B, n_heads, head_dim, T) -> (B, n_heads, T, T)
+            wei = q @ k.transpose(-2, -1) * (1.0 / (self.head_dim**0.5))
+            wei = wei.masked_fill(self.mask[:T, :T] == 0, float("-inf"))
+            wei = F.softmax(wei, dim=-1)
 
-        # (B, n_heads, T, T) x (B, n_heads, T, head_dim) -> (B, n_heads, T, head_dim)
-        output = wei @ v
-        output = output.transpose(1, 2).contiguous().view(B, T, C)
+            # (B, n_heads, T, T) x (B, n_heads, T, head_dim) -> (B, n_heads, T, head_dim)
+            y = wei @ v
+
+        output = y.transpose(1, 2).contiguous().view(B, T, C)
         output = self.wo(output)
 
         return output
@@ -174,6 +183,8 @@ class LanguageModel(nn.Module):
             [TransformerBlock(config) for _ in range(config.n_layers)]
         )
 
+        self.final_norm = nn.LayerNorm(config.dim, eps=config.norm_eps)
+
         self.lm_head = nn.Linear(
             in_features=config.dim, out_features=config.vocab_size
         )  # (B, T, vocab_size)
@@ -189,6 +200,7 @@ class LanguageModel(nn.Module):
         for block in self.blocks:
             x = block(x)
 
+        x = self.final_norm(x)
         logits = self.lm_head(x)
 
         if targets is not None:

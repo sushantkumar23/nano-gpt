@@ -8,11 +8,13 @@ The transformer is implemented in `model.py` and the training can be done by set
 
 - [x] Self-Attention
 - [x] Scaled Dot-Product Attention
-- [x] Feed-Forward Network
-- [x] Positional Embedding
-- [x] Residual Connection
-- [x] Layer Normalization
+- [x] FeedForward Network
+- [x] Absolute Positional Embedding
+- [x] Residual Connection (Attention and FeedForward)
+- [x] Layer Normalization (Attention and FeedForward)
+- [x] Layer Normalization (Final)
 - [x] Multi-Head Attention
+- [x] Dropout
 
 ### Phase 2
 
@@ -20,6 +22,7 @@ The transformer is implemented in `model.py` and the training can be done by set
 - [ ] RMS Layer Normalization
 - [ ] KV Cache
 - [ ] Multi-Query Attention
-- [ ] SwiGLU Activation (Feed-Forward Network)
+- [ ] SwiGLU Activation (FeedForward Network)
+- [ ] Flash Attention
 - [ ] Sliding Window Attention
 - [ ] Mixture of Experts
