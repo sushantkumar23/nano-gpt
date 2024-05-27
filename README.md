@@ -12,13 +12,13 @@ The transformer is implemented in `model.py` and the training can be done by set
 - [x] Absolute Positional Embedding
 - [x] Residual Connection (Attention and FeedForward)
 - [x] Layer Normalization (Attention and FeedForward)
-- [x] Layer Normalization (Final)
 - [x] Multi-Head Attention
 - [x] Dropout
 
 ### Improvement over the years
 
 - [ ] Rotary Positional Embedding
+- [x] Layer Normalization (Final)
 - [ ] RMS Layer Normalization
 - [ ] KV Cache
 - [ ] Grouped-Query Attention

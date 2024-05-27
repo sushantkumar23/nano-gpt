@@ -48,17 +48,17 @@ class MultiHeadSelfAttention(nn.Module):
         assert self.dim % self.n_heads == 0
         self.head_dim = config.dim // config.n_heads
 
-        self.wq = nn.Linear(
+        self.q_proj = nn.Linear(
             in_features=config.dim, out_features=self.n_heads * self.head_dim
         )
-        self.wk = nn.Linear(
+        self.k_proj = nn.Linear(
             in_features=config.dim, out_features=self.n_heads * self.head_dim
         )
-        self.wv = nn.Linear(
+        self.v_proj = nn.Linear(
             in_features=config.dim, out_features=self.n_heads * self.head_dim
         )
 
-        self.wo = nn.Linear(
+        self.out_proj = nn.Linear(
             in_features=self.n_heads * self.head_dim, out_features=config.dim
         )
 
@@ -73,9 +73,9 @@ class MultiHeadSelfAttention(nn.Module):
 
     def forward(self, x):
         B, T, C = x.shape
-        q = self.wq(x)
-        k = self.wk(x)
-        v = self.wv(x)
+        q = self.q_proj(x)
+        k = self.k_proj(x)
+        v = self.v_proj(x)
 
         # (B, T, C) -> (B, T, n_heads, head_dim) -> (B, n_heads, T, head_dim)
         q = q.view(B, T, self.n_heads, self.head_dim).transpose(1, 2)
@@ -95,7 +95,7 @@ class MultiHeadSelfAttention(nn.Module):
             y = wei @ v
 
         output = y.transpose(1, 2).contiguous().view(B, T, C)
-        output = self.wo(output)
+        output = self.out_proj(output)
 
         return output
 
