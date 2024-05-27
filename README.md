@@ -4,7 +4,7 @@ We will be building a GPT-like decoder-only transformer from scratch using PyTor
 
 The transformer is implemented in `model.py` and the training can be done by setting the `training` flag to `True` in `model.py`.
 
-### Phase 1
+### Original Transformer
 
 - [x] Self-Attention
 - [x] Scaled Dot-Product Attention
@@ -16,13 +16,22 @@ The transformer is implemented in `model.py` and the training can be done by set
 - [x] Multi-Head Attention
 - [x] Dropout
 
-### Phase 2
+### Improvement over the years
 
 - [ ] Rotary Positional Embedding
 - [ ] RMS Layer Normalization
 - [ ] KV Cache
 - [ ] Multi-Query Attention
 - [ ] SwiGLU Activation (FeedForward Network)
-- [ ] Flash Attention
+- [x] Flash Attention
 - [ ] Sliding Window Attention
 - [ ] Mixture of Experts
+
+Each of the improvement were introduced over the years with a research paper.
+
+#### RoPE: Rotary Positional Embedding
+These were introduced in the paper (RoFormer: Enhanced Transformer with Rotary Position Embedding)[https://arxiv.org/abs/2104.09864]
+
+#### RMSNorm: Root Mean Square Layer Normalization
+RMSNorms got introduced by Zhang et. al in 2019 in a paper called (Root Mean Square Layer Normalization)[https://arxiv.org/abs/1910.07467]
+
